@@ -133,6 +133,8 @@
 
         /**
          * Simulates a signed transaction via the Base Mini-App SDK.
+         * In a real app, this would use the global 'sdk' object:
+         * e.g., const txHash = await sdk.actions.sendTransaction(transactionData);
          * @param {object} transactionData - The transaction details.
          * @returns {Promise<string>} The mocked transaction hash.
          */
@@ -590,6 +592,21 @@
             ];
 
             showTab('swap'); // Show 'Swap' tab by default
+
+            // --- Farcaster Mini-App Readiness Check (Farcaster Mini-App prastuti parīkshā) ---
+            // MUST call sdk.actions.ready() to tell the Farcaster client (e.g., Warpcast) 
+            // that the application is fully loaded and ready to interact, thus removing the splash screen.
+            if (typeof sdk !== 'undefined' && sdk.actions && typeof sdk.actions.ready === 'function') {
+                try {
+                    sdk.actions.ready();
+                    console.log("Farcaster SDK: App is ready, splash screen removed.");
+                } catch (e) {
+                    // This often fails if the SDK object is provided but the environment is not Farcaster.
+                    console.warn("Farcaster SDK: Failed to call sdk.actions.ready()", e);
+                }
+            } else {
+                console.warn("Farcaster SDK object (sdk.actions.ready) not found. Running in standalone mode.");
+            }
         });
 
     </script>
