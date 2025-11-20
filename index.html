@@ -77,6 +77,8 @@
 
         <div class="text-center p-4 bg-gray-50 rounded-lg mb-6 border border-gray-200">
             <p class="text-5xl font-black text-gray-800" id="neynar-score-display">--</p>
+            <!-- New element to explain score status -->
+            <p class="text-sm text-gray-500 mt-1" id="score-status-message"></p>
         </div>
 
         <div class="space-y-3">
@@ -99,10 +101,16 @@
             </div>
         </div>
 
-        <button id="share-score-btn" class="w-full btn-primary mt-6 flex items-center justify-center">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.93 9 12.482 9 12c0-.482-.114-.93-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6.632l6.632-3.316m3.316 0a3 3 0 100-6 3 3 0 000 6zm0 9.316a3 3 0 100 6 3 3 0 000-6z"></path></svg>
-            Share Neynar Score
-        </button>
+        <!-- TWO BUTTONS: Check Again and Share Your Profile -->
+        <div class="flex space-x-4 mt-6">
+            <button id="check-again-btn" class="w-1/2 bg-gray-200 text-gray-800 p-3 rounded-full font-semibold hover:bg-gray-300 transition-colors">
+                Check Again
+            </button>
+            <button id="share-score-btn" class="w-1/2 btn-primary flex items-center justify-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.93 9 12.482 9 12c0-.482-.114-.93-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6.632l6.632-3.316m3.316 0a3 3 0 100-6 3 3 0 000 6zm0 9.316a3 3 0 100 6 3 3 0 000-6z"></path></svg>
+                Share Your Profile
+            </button>
+        </div>
     </div>
 
     <div id="error-view" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4">
@@ -129,6 +137,7 @@
     const errorMessage = document.getElementById('error-message');
     const checkEligibilityBtn = document.getElementById('check-eligibility-btn');
     const shareScoreBtn = document.getElementById('share-score-btn');
+    const checkAgainBtn = document.getElementById('check-again-btn'); // NEW UI element
     
     // New UI elements
     const fidInputGroup = document.getElementById('fid-input-group');
@@ -137,12 +146,19 @@
 
 
     let currentScoreData = null; // Stored data for sharing
+    let currentFid = null; // Store FID globally for re-checks
 
     /**
      * Switches the UI view.
      * @param {string} viewName - 'initial', 'loading', 'card', 'error'
      */
     function switchView(viewName) {
+        // Ensure error view is reset to default (red) colors before hiding/showing
+        const defaultClasses = ['bg-red-100', 'border-red-400', 'text-red-700'];
+        const successClasses = ['bg-green-100', 'border-green-400', 'text-green-700'];
+        errorView.classList.remove(...successClasses);
+        errorView.classList.add(...defaultClasses);
+
         [initialView, loadingView, scoreCardView, errorView].forEach(el => el.classList.add('hidden'));
         if (viewName === 'initial') initialView.classList.remove('hidden');
         if (viewName === 'loading') loadingView.classList.remove('hidden');
@@ -267,27 +283,32 @@
         document.getElementById('account-age').textContent = calculateAccountAge(user.created_at);
         
         const score = user.extras?.fid_quality_score;
-        document.getElementById('neynar-score-display').textContent = score !== undefined ? score.toFixed(2) : 'N/A';
+        const scoreDisplay = document.getElementById('neynar-score-display');
+        const scoreStatusMessage = document.getElementById('score-status-message'); 
+
+        if (score !== undefined) {
+            scoreDisplay.textContent = score.toFixed(2);
+            scoreStatusMessage.textContent = 'Score successfully retrieved.';
+        } else {
+            scoreDisplay.textContent = 'N/A';
+            scoreStatusMessage.textContent = 'Score data is not available for this FID from Neynar API.';
+            console.warn('FID Quality Score is missing from Neynar API response for FID:', user.fid);
+        }
 
         switchView('card');
     }
 
     /**
-     * Generates a Cast to share the score on Farcaster.
+     * Generates a Cast to share the score on Farcaster, or copies to clipboard in Standalone mode.
      */
     function shareScore() {
-        if (!currentScoreData || typeof FarcasterSDK === 'undefined' || !FarcasterSDK.shareCast) {
-            // Share function disabled in Standalone/Base App mode
-            // Using a custom modal is better than alert(), but for simplicity in this context:
-            const shareMessage = "Share function is disabled in this (Standalone) mode. It only works inside the Farcaster Mini App.";
-            document.getElementById('error-message').textContent = shareMessage;
+        if (!currentScoreData) {
+            document.getElementById('error-message').textContent = "No score data available to share.";
             errorView.classList.remove('hidden');
-            setTimeout(() => errorView.classList.add('hidden'), 5000);
             return;
         }
-
-        const score = currentScoreData.extras?.fid_quality_score;
         
+        const score = currentScoreData.extras?.fid_quality_score;
         const text = `My Neynar Score is: ${score !== undefined ? score.toFixed(2) : 'N/A'}!
 
 My Account Status:
@@ -296,12 +317,76 @@ My Account Status:
 
 Check your score too. 👇`;
         
+        // 1. Check if Farcaster SDK is available (Mini App Mode)
+        if (typeof FarcasterSDK !== 'undefined' && FarcasterSDK.shareCast) {
+            try {
+                // Use Farcaster SDK's 'shareCast' function
+                FarcasterSDK.shareCast(text);
+                return; 
+            } catch (e) {
+                document.getElementById('error-message').textContent = "SDK Error: Cannot share.";
+                errorView.classList.remove('hidden');
+                return;
+            }
+        }
+        
+        // 2. Standalone Mode Workaround: Copy text to clipboard
         try {
-            // Use Farcaster SDK's 'shareCast' function
-            FarcasterSDK.shareCast(text);
-        } catch (e) {
-            document.getElementById('error-message').textContent = "SDK Error: Cannot share.";
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            tempInput.style.position = 'fixed';
+            tempInput.style.opacity = '0';
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            // Display success message
+            const successMessage = "Cast text copied to clipboard! Paste it on Farcaster.";
+            
+            const defaultClasses = ['bg-red-100', 'border-red-400', 'text-red-700'];
+            const successClasses = ['bg-green-100', 'border-green-400', 'text-green-700'];
+            
+            // Swap classes for success look
+            errorView.classList.remove(...defaultClasses);
+            errorView.classList.add(...successClasses);
+
+            errorMessage.innerHTML = `<strong class="font-bold">Copied!</strong> ${successMessage}`;
             errorView.classList.remove('hidden');
+            
+            // Revert styling after a delay
+            setTimeout(() => {
+                errorView.classList.add('hidden');
+                errorView.classList.remove(...successClasses);
+                errorView.classList.add(...defaultClasses);
+            }, 3000);
+
+        } catch (e) {
+            // Fallback for copy command failure
+            console.error("Copy failed:", e);
+            document.getElementById('error-message').textContent = "Clipboard access denied. Please try again or manually copy the data.";
+            errorView.classList.remove('hidden');
+        }
+    }
+    
+    /**
+     * Resets the view back to the initial state.
+     */
+    function checkAgain() {
+        currentScoreData = null; 
+        switchView('initial');
+        
+        // Determine if we are in Mini App Mode again to set the initial view correctly
+        const isMiniApp = typeof FarcasterSDK !== 'undefined' && FarcasterSDK.getUserData;
+
+        if (isMiniApp) {
+            // Mini App: FID is known, hide input. Button click will trigger auto-fetch again.
+            fidInputGroup.classList.add('hidden');
+            checkEligibilityBtn.textContent = "Check Eligibility";
+        } else {
+            // Standalone: Show input and prompt user to click "View Score".
+            fidInputGroup.classList.remove('hidden');
+            checkEligibilityBtn.textContent = "View Score";
         }
     }
 
@@ -311,11 +396,10 @@ Check your score too. 👇`;
     async function initApp() {
         // Check for FarcasterSDK availability
         const isMiniApp = typeof FarcasterSDK !== 'undefined' && FarcasterSDK.getUserData;
-        let currentFid = null;
 
         if (isMiniApp) {
-            // Mini App Mode (Inside Farcaster Client)
-            console.log("Running in Farcaster Mini App Mode.");
+            // Mini App Mode: AUTOMATICALLY FETCH DATA ON LOAD
+            console.log("Running in Farcaster Mini App Mode. Attempting auto-fetch.");
             modeInfo.textContent = "Farcaster Mini App Mode: Your FID will be automatically detected.";
             modeInfo.classList.remove('hidden');
 
@@ -324,20 +408,19 @@ Check your score too. 👇`;
                 currentFid = userData.fid;
                 console.log("Farcaster User Data:", userData);
 
-                if (!currentFid) {
+                if (currentFid) {
+                    // Start loading view immediately
+                    await fetchNeynarScore(currentFid, currentFid);
+                } else {
                     switchView('error');
                     errorMessage.textContent = "Farcaster FID not found. Please reload the app.";
                     return;
                 }
-                
-                // Hide input since FID is automatically found in Mini App Mode
-                fidInputGroup.classList.add('hidden');
-
             } catch (e) {
-                switchView('error');
-                errorMessage.textContent = "Failed to fetch Farcaster user data.";
-                return;
+                // Error during auto-fetch. fetchNeynarScore handles switching to 'error' view.
+                console.error("Auto-fetch failed:", e);
             }
+
         } else {
             // Standalone / Base App (Web Preview) Mode Simulation
             console.warn("Farcaster SDK is not available. Running in Standalone/Base App (Web Preview) Mode.");
@@ -350,26 +433,26 @@ Check your score too. 👇`;
         }
 
 
-        // Set up click event for the check button
+        // Set up click event for the check eligibility button (used in Standalone and for 'Check Again' action)
         checkEligibilityBtn.addEventListener('click', () => {
             
-            // Clear any previous error message
             errorView.classList.add('hidden');
             
             let fidToFetch = currentFid;
 
-            if (!isMiniApp) {
-                // Standalone Mode: Get FID from input field
+            // If we are in Standalone mode or MiniApp mode but are clicking 'Check Eligibility' again
+            if (!isMiniApp || !fidToFetch) {
                 fidToFetch = parseInt(fidInput.value, 10);
                 if (isNaN(fidToFetch) || fidToFetch <= 0) {
                     switchView('error');
                     errorMessage.textContent = "Please enter a valid Farcaster FID.";
                     return;
                 }
+                // Update currentFid for subsequent checks in Standalone Mode
+                currentFid = fidToFetch; 
             }
 
             if (fidToFetch) {
-                // Use the FID as both the FID and the Viewer FID (Self-lookup).
                 fetchNeynarScore(fidToFetch, fidToFetch);
             } else {
                  switchView('error');
@@ -379,6 +462,9 @@ Check your score too. 👇`;
 
         // Set up click event for the share button
         shareScoreBtn.addEventListener('click', shareScore);
+        
+        // Set up click event for the check again button (NEW)
+        checkAgainBtn.addEventListener('click', checkAgain);
     }
 
     // Start the app
