@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neynar Score - Farcaster Mini App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Using Inter font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+        .shadow-neynar {
+            box-shadow: 0 10px 20px -5px rgba(103, 30, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background-color: #671eff; /* Neynar primary color */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #5514e8;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="container">
+    <div id="initial-view" class="flex flex-col items-center justify-center text-center">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800">Calculate Your Neynar Score</h1>
+        
+        <!-- Input field: Visible only when Farcaster SDK is missing (Standalone Mode) -->
+        <div id="fid-input-group" class="w-full mb-4 hidden">
+            <label for="fid-input" class="text-sm font-medium text-gray-600 block mb-1">Enter Your FID (Standalone Mode)</label>
+            <input type="number" id="fid-input" placeholder="e.g., 12345" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#671eff] focus:border-[#671eff]">
+            <p class="text-xs text-gray-500 mt-1">For use outside the Farcaster client.</p>
+        </div>
+
+        <button id="check-eligibility-btn" class="btn-primary shadow-neynar">
+            Check Eligibility
+        </button>
+        <!-- Mode information display -->
+        <p id="mode-info" class="text-sm mt-3 text-gray-500 hidden"></p>
+    </div>
+
+    <div id="loading-view" class="hidden flex flex-col items-center justify-center text-center">
+        <svg class="animate-spin h-8 w-8 text-[#671eff] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-gray-600">Loading your Farcaster data...</p>
+    </div>
+
+    <div id="score-card-view" class="hidden bg-white p-6 rounded-xl shadow-neynar border border-gray-100">
+        <div class="flex flex-col items-center mb-6">
+            <img id="profile-pic" class="w-24 h-24 rounded-full object-cover border-4 border-[#671eff] shadow-md" alt="User Profile Picture" src="https://placehold.co/96x96/f3f4f6/000000?text=PFP">
+            <p class="text-xl font-bold mt-3 text-gray-900" id="username-display">@user</p>
+            <p class="text-sm text-gray-500">FID: <span id="fid-display">00000</span></p>
+        </div>
+
+        <h2 class="text-center text-3xl font-extrabold mb-4 text-[#671eff]">Neynar Score</h2>
+
+        <div class="text-center p-4 bg-gray-50 rounded-lg mb-6 border border-gray-200">
+            <p class="text-5xl font-black text-gray-800" id="neynar-score-display">--</p>
+        </div>
+
+        <div class="space-y-3">
+            <!-- Data Rows -->
+            <div class="flex justify-between items-center text-gray-700 border-b pb-2">
+                <span class="font-medium flex items-center">Followers</span>
+                <span id="follower-count" class="font-semibold text-gray-900">--</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700 border-b pb-2">
+                <span class="font-medium flex items-center">Following</span>
+                <span id="following-count" class="font-semibold text-gray-900">--</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700 border-b pb-2">
+                <span class="font-medium flex items-center">Total Casts</span>
+                <span id="total-casts" class="font-semibold text-gray-900">--</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700 border-b pb-2">
+                <span class="font-medium flex items-center">Account Age</span>
+                <span id="account-age" class="font-semibold text-gray-900">--</span>
+            </div>
+        </div>
+
+        <button id="share-score-btn" class="w-full btn-primary mt-6 flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.93 9 12.482 9 12c0-.482-.114-.93-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6.632l6.632-3.316m3.316 0a3 3 0 100-6 3 3 0 000 6zm0 9.316a3 3 0 100 6 3 3 0 000-6z"></path></svg>
+            Share Neynar Score
+        </button>
+    </div>
+
+    <div id="error-view" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4">
+        <strong class="font-bold">Error!</strong>
+        <span class="block sm:inline" id="error-message"> An error occurred while loading data.</span>
+    </div>
+</div>
+
+<script>
+    // ***************************************************************
+    // CRITICAL: Insert your Neynar API Key here.
+    // Replace "YOUR_NEYNAR_API_KEY" with your actual key.
+    // This app should ideally be run via a proxy server for security.
+    // ***************************************************************
+    const NEYNAR_API_KEY = "YOUR_NEYNAR_API_KEY"; 
+    const NEYNAR_BULK_USERS_URL = "https://api.neynar.com/v2/farcaster/user/bulk";
+
+    // UI elements
+    const appElement = document.getElementById('app');
+    const initialView = document.getElementById('initial-view');
+    const loadingView = document.getElementById('loading-view');
+    const scoreCardView = document.getElementById('score-card-view');
+    const errorView = document.getElementById('error-view');
+    const errorMessage = document.getElementById('error-message');
+    const checkEligibilityBtn = document.getElementById('check-eligibility-btn');
+    const shareScoreBtn = document.getElementById('share-score-btn');
+    
+    // New UI elements
+    const fidInputGroup = document.getElementById('fid-input-group');
+    const fidInput = document.getElementById('fid-input');
+    const modeInfo = document.getElementById('mode-info');
+
+
+    let currentScoreData = null; // Stored data for sharing
+
+    /**
+     * Switches the UI view.
+     * @param {string} viewName - 'initial', 'loading', 'card', 'error'
+     */
+    function switchView(viewName) {
+        [initialView, loadingView, scoreCardView, errorView].forEach(el => el.classList.add('hidden'));
+        if (viewName === 'initial') initialView.classList.remove('hidden');
+        if (viewName === 'loading') loadingView.classList.remove('hidden');
+        if (viewName === 'card') scoreCardView.classList.remove('hidden');
+        if (viewName === 'error') errorView.classList.remove('hidden');
+    }
+
+    /**
+     * Calculates account age in days, months, or years.
+     * @param {string} createdAtDateString - ISO 8601 date string
+     * @returns {string} - "X days", "Y months", or "Z years"
+     */
+    function calculateAccountAge(createdAtDateString) {
+        try {
+            const created = new Date(createdAtDateString);
+            const now = new Date();
+            const diffTime = Math.abs(now - created);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 30) {
+                return `${diffDays} days`;
+            } else if (diffDays < 365) {
+                const months = Math.floor(diffDays / 30.44); // Average days in a month
+                return `${months} months`;
+            } else {
+                const years = (diffDays / 365.25).toFixed(1);
+                return `${years} years`;
+            }
+        } catch (e) {
+            console.error("Account age calculation error:", e);
+            return createdAtDateString.split('T')[0] || '--'; // Show date only
+        }
+    }
+    
+    /**
+     * Fetches user data and score from the Neynar API.
+     * @param {number} fid - Farcaster User ID
+     * @param {number} viewerFid - Viewer's Farcaster User ID (usually the same)
+     */
+    async function fetchNeynarScore(fid, viewerFid) {
+        switchView('loading');
+        
+        // Check for placeholder key
+        if (NEYNAR_API_KEY === "YOUR_NEYNAR_API_KEY") {
+             switchView('error');
+             errorMessage.textContent = "API Key is missing! Please insert your Key in the code.";
+             return;
+        }
+
+        let attempt = 0;
+        const maxAttempts = 3;
+
+        while (attempt < maxAttempts) {
+            try {
+                const url = `${NEYNAR_BULK_USERS_URL}?fids=${fid}&viewer_fid=${viewerFid}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 
+                        'accept': 'application/json',
+                        'api_key': NEYNAR_API_KEY 
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorDetails = await response.json();
+                    let msg = `API Error: ${response.status}.`;
+                    if (response.status === 401) {
+                        msg = "API Key is incorrect or invalid.";
+                    } else {
+                        msg = errorDetails.message ? `API Error: ${errorDetails.message}` : `API Error: ${response.status}`;
+                    }
+                    throw new Error(msg);
+                }
+
+                const data = await response.json();
+                const user = data.users?.[0];
+
+                if (!user) {
+                    throw new Error("No user data was received from the API.");
+                }
+                
+                renderCard(user);
+                currentScoreData = user; // Store data for sharing
+                return; // Exit loop on success
+
+            } catch (error) {
+                attempt++;
+                console.error(`Attempt ${attempt} failed:`, error.message);
+
+                if (attempt >= maxAttempts) {
+                    // Show error after all attempts fail
+                    switchView('error');
+                    errorMessage.textContent = `Could not load data: ${error.message}`;
+                    return;
+                }
+
+                // Exponential backoff (1s, 2s)
+                const delay = Math.pow(2, attempt) * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
+    /**
+     * Renders the data onto the score card.
+     * @param {object} user - User data received from Neynar API.
+     */
+    function renderCard(user) {
+        document.getElementById('profile-pic').src = user.pfp_url || 'https://placehold.co/96x96/f3f4f6/000000?text=PFP';
+        document.getElementById('username-display').textContent = `@${user.username || 'N/A'}`;
+        document.getElementById('fid-display').textContent = user.fid || 'N/A';
+        document.getElementById('follower-count').textContent = (user.follower_count || 0).toLocaleString('en-US');
+        document.getElementById('following-count').textContent = (user.following_count || 0).toLocaleString('en-US');
+        document.getElementById('total-casts').textContent = (user.total_cast_count || 0).toLocaleString('en-US');
+        document.getElementById('account-age').textContent = calculateAccountAge(user.created_at);
+        
+        const score = user.extras?.fid_quality_score;
+        document.getElementById('neynar-score-display').textContent = score !== undefined ? score.toFixed(2) : 'N/A';
+
+        switchView('card');
+    }
+
+    /**
+     * Generates a Cast to share the score on Farcaster.
+     */
+    function shareScore() {
+        if (!currentScoreData || typeof FarcasterSDK === 'undefined' || !FarcasterSDK.shareCast) {
+            // Share function disabled in Standalone/Base App mode
+            // Using a custom modal is better than alert(), but for simplicity in this context:
+            const shareMessage = "Share function is disabled in this (Standalone) mode. It only works inside the Farcaster Mini App.";
+            document.getElementById('error-message').textContent = shareMessage;
+            errorView.classList.remove('hidden');
+            setTimeout(() => errorView.classList.add('hidden'), 5000);
+            return;
+        }
+
+        const score = currentScoreData.extras?.fid_quality_score;
+        
+        const text = `My Neynar Score is: ${score !== undefined ? score.toFixed(2) : 'N/A'}!
+
+My Account Status:
+- Followers: ${currentScoreData.follower_count.toLocaleString('en-US')}
+- Casts: ${currentScoreData.total_cast_count.toLocaleString('en-US')}
+
+Check your score too. 👇`;
+        
+        try {
+            // Use Farcaster SDK's 'shareCast' function
+            FarcasterSDK.shareCast(text);
+        } catch (e) {
+            document.getElementById('error-message').textContent = "SDK Error: Cannot share.";
+            errorView.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * Initializes the app and sets up event listeners.
+     */
+    async function initApp() {
+        // Check for FarcasterSDK availability
+        const isMiniApp = typeof FarcasterSDK !== 'undefined' && FarcasterSDK.getUserData;
+        let currentFid = null;
+
+        if (isMiniApp) {
+            // Mini App Mode (Inside Farcaster Client)
+            console.log("Running in Farcaster Mini App Mode.");
+            modeInfo.textContent = "Farcaster Mini App Mode: Your FID will be automatically detected.";
+            modeInfo.classList.remove('hidden');
+
+            try {
+                const userData = await FarcasterSDK.getUserData();
+                currentFid = userData.fid;
+                console.log("Farcaster User Data:", userData);
+
+                if (!currentFid) {
+                    switchView('error');
+                    errorMessage.textContent = "Farcaster FID not found. Please reload the app.";
+                    return;
+                }
+                
+                // Hide input since FID is automatically found in Mini App Mode
+                fidInputGroup.classList.add('hidden');
+
+            } catch (e) {
+                switchView('error');
+                errorMessage.textContent = "Failed to fetch Farcaster user data.";
+                return;
+            }
+        } else {
+            // Standalone / Base App (Web Preview) Mode Simulation
+            console.warn("Farcaster SDK is not available. Running in Standalone/Base App (Web Preview) Mode.");
+            modeInfo.textContent = "Standalone Mode: Enter your FID. (Base App Simulation)";
+            modeInfo.classList.remove('hidden');
+            
+            // Show input in Standalone Mode
+            fidInputGroup.classList.remove('hidden');
+            checkEligibilityBtn.textContent = "View Score"; // Change button text
+        }
+
+
+        // Set up click event for the check button
+        checkEligibilityBtn.addEventListener('click', () => {
+            
+            // Clear any previous error message
+            errorView.classList.add('hidden');
+            
+            let fidToFetch = currentFid;
+
+            if (!isMiniApp) {
+                // Standalone Mode: Get FID from input field
+                fidToFetch = parseInt(fidInput.value, 10);
+                if (isNaN(fidToFetch) || fidToFetch <= 0) {
+                    switchView('error');
+                    errorMessage.textContent = "Please enter a valid Farcaster FID.";
+                    return;
+                }
+            }
+
+            if (fidToFetch) {
+                // Use the FID as both the FID and the Viewer FID (Self-lookup).
+                fetchNeynarScore(fidToFetch, fidToFetch);
+            } else {
+                 switchView('error');
+                 errorMessage.textContent = "FID not detected or entered.";
+            }
+        });
+
+        // Set up click event for the share button
+        shareScoreBtn.addEventListener('click', shareScore);
+    }
+
+    // Start the app
+    window.onload = initApp;
+
+</script>
+</body>
+</html>
