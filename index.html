@@ -117,7 +117,7 @@
     // Replace "YOUR_NEYNAR_API_KEY" with your actual key.
     // This app should ideally be run via a proxy server for security.
     // ***************************************************************
-    const NEYNAR_API_KEY = "YOUR_NEYNAR_API_KEY"; 
+    const NEYNAR_API_KEY = "E7B9F344-4327-4C0C-BA28-A363B88CAB7B"; // API Key set successfully.
     const NEYNAR_BULK_USERS_URL = "https://api.neynar.com/v2/farcaster/user/bulk";
 
     // UI elements
@@ -159,6 +159,12 @@
         try {
             const created = new Date(createdAtDateString);
             const now = new Date();
+            
+            // Check for Invalid Date, which causes NaN
+            if (isNaN(created.getTime())) {
+                return 'Unknown'; 
+            }
+
             const diffTime = Math.abs(now - created);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
@@ -173,7 +179,7 @@
             }
         } catch (e) {
             console.error("Account age calculation error:", e);
-            return createdAtDateString.split('T')[0] || '--'; // Show date only
+            return 'Error calculating age'; 
         }
     }
     
@@ -185,8 +191,8 @@
     async function fetchNeynarScore(fid, viewerFid) {
         switchView('loading');
         
-        // Check for placeholder key
-        if (NEYNAR_API_KEY === "E7B9F344-4327-4C0C-BA28-A363B88CAB7B") {
+        // Check for placeholder key (no longer needed, but kept for robustness if key were blank)
+        if (NEYNAR_API_KEY === "" || NEYNAR_API_KEY === "<YOUR_ACTUAL_NEYNAR_API_KEY_HERE>") {
              switchView('error');
              errorMessage.textContent = "API Key is missing! Please insert your Key in the code.";
              return;
